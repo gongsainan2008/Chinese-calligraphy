@@ -89,6 +89,17 @@
             >+</button>
           </div>
 
+          <!-- 米字格开关 -->
+          <button 
+            @click="showGrid = !showGrid"
+            :class="[
+              'px-4 py-2 rounded',
+              showGrid ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
+            ]"
+          >
+            米字格
+          </button>
+
           <!-- 操作按钮 -->
           <button 
             @click="clearCanvas"
@@ -122,10 +133,27 @@
             :style="{ backgroundImage: `url(${currentCalligraphy.image})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }"
           ></div>
           
-          <!-- 书写层（透明） -->
+          <!-- 米字格层 -->
+          <div v-if="showGrid" class="absolute inset-0 pointer-events-none">
+            <svg class="w-full h-full" viewBox="0 0 600 600" preserveAspectRatio="none">
+              <!-- 外框 -->
+              <rect x="1" y="1" width="598" height="598" fill="none" stroke="#c4b5a0" stroke-width="2"/>
+              <!-- 横中线 -->
+              <line x1="1" y1="300" x2="599" y2="300" stroke="#c4b5a0" stroke-width="1" stroke-dasharray="8,4"/>
+              <!-- 竖中线 -->
+              <line x1="300" y1="1" x2="300" y2="599" stroke="#c4b5a0" stroke-width="1" stroke-dasharray="8,4"/>
+              <!-- 左斜线 -->
+              <line x1="1" y1="1" x2="599" y2="599" stroke="#c4b5a0" stroke-width="1" stroke-dasharray="8,4"/>
+              <!-- 右斜线 -->
+              <line x1="599" y1="1" x2="1" y2="599" stroke="#c4b5a0" stroke-width="1" stroke-dasharray="8,4"/>
+            </svg>
+          </div>
+          
+          <!-- 书写层（半透明练习纸效果） -->
           <canvas
             ref="canvasRef"
             class="absolute inset-0 w-full h-full cursor-crosshair touch-none"
+            style="background-color: rgba(255, 255, 255, 0.25);"
             @mousedown="startDraw"
             @mousemove="draw"
             @mouseup="stopDraw"
@@ -169,6 +197,9 @@ const scale = ref(1)
 // 画布尺寸
 const containerWidth = ref(600)
 const containerHeight = ref(600)
+
+// 米字格显示
+const showGrid = ref(true)
 
 // 绘图状态
 const isDrawing = ref(false)
@@ -291,8 +322,41 @@ const saveImage = () => {
   img.onload = () => {
     mergeCtx.drawImage(img, 0, 0, w, h)
     
+    // 绘制半透明背景层
+    mergeCtx.fillStyle = 'rgba(255, 255, 255, 0.25)'
+    mergeCtx.fillRect(0, 0, w, h)
+    
     // 绘制用户书写
     mergeCtx.drawImage(canvasRef.value, 0, 0, w, h)
+    
+    // 如果显示米字格，绘制格子
+    if (showGrid.value) {
+      mergeCtx.strokeStyle = '#c4b5a0'
+      mergeCtx.lineWidth = 1
+      // 外框
+      mergeCtx.strokeRect(1, 1, w - 2, h - 2)
+      // 横中线
+      mergeCtx.setLineDash([8, 4])
+      mergeCtx.beginPath()
+      mergeCtx.moveTo(1, h / 2)
+      mergeCtx.lineTo(w - 1, h / 2)
+      mergeCtx.stroke()
+      // 竖中线
+      mergeCtx.beginPath()
+      mergeCtx.moveTo(w / 2, 1)
+      mergeCtx.lineTo(w / 2, h - 1)
+      mergeCtx.stroke()
+      // 对角线
+      mergeCtx.beginPath()
+      mergeCtx.moveTo(1, 1)
+      mergeCtx.lineTo(w - 1, h - 1)
+      mergeCtx.stroke()
+      mergeCtx.beginPath()
+      mergeCtx.moveTo(w - 1, 1)
+      mergeCtx.lineTo(1, h - 1)
+      mergeCtx.stroke()
+      mergeCtx.setLineDash([])
+    }
     
     // 下载
     const link = document.createElement('a')
