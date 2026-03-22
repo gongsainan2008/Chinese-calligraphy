@@ -158,6 +158,7 @@
             @mousemove="draw"
             @mouseup="stopDraw"
             @mouseleave="stopDraw"
+            @contextmenu.prevent="stopDraw"
             @touchstart.prevent="startDraw"
             @touchmove.prevent="draw"
             @touchend.prevent="stopDraw"
@@ -234,8 +235,13 @@ const initCanvas = () => {
   // 默认不设置任何背景色，保持完全透明
 }
 
-// 开始绘制
+// 开始绘制（点击开始）
 const startDraw = (e) => {
+  // 阻止默认事件
+  e.preventDefault()
+  // 左键或触摸开始
+  if (e.type === 'mousedown' && e.button !== 0) return
+  
   isDrawing.value = true
   const { x, y } = getPosition(e)
   lastX = x
@@ -263,8 +269,12 @@ const draw = (e) => {
   lastY = y
 }
 
-// 停止绘制
-const stopDraw = () => {
+// 停止绘制（右键或松手）
+const stopDraw = (e) => {
+  // 右键结束
+  if (e && e.type === 'contextmenu') {
+    e.preventDefault()
+  }
   isDrawing.value = false
 }
 
