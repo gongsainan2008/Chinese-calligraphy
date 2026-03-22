@@ -148,12 +148,12 @@ const currentCalligraphy = ref(null)
 const canvasRef = ref(null)
 let ctx = null
 
-// 画笔设置
-const brushSize = ref(20)
+// 画笔设置（硬笔书法）
+const brushSize = ref(6)
 const brushSizes = [
-  { value: 12, preview: 8 },
-  { value: 20, preview: 12 },
-  { value: 32, preview: 18 }
+  { value: 3, preview: 3 },
+  { value: 6, preview: 6 },
+  { value: 10, preview: 10 }
 ]
 
 const inkColor = ref('#1a1a1a')
@@ -174,10 +174,6 @@ const containerHeight = ref(600)
 const isDrawing = ref(false)
 let lastX = 0
 let lastY = 0
-let lastPressure = 0.5
-
-// 笔迹路径（用于模拟毛笔）
-let strokePoints = []
 
 // 选择字帖
 const selectCalligraphy = async (item) => {
@@ -210,112 +206,50 @@ const initCanvas = () => {
 // 开始绘制
 const startDraw = (e) => {
   isDrawing.value = true
-  const { x, y, pressure } = getPosition(e)
+  const { x, y } = getPosition(e)
   lastX = x
   lastY = y
-  lastPressure = pressure || 0.5
-  strokePoints = [{ x, y, pressure: lastPressure }]
 }
 
-// 绘制中 - 毛笔效果
+// 绘制中 - 硬笔书法效果
 const draw = (e) => {
   if (!isDrawing.value || !ctx) return
   
-  const { x, y, pressure } = getPosition(e)
-  const currentPressure = pressure || 0.5
+  const { x, y } = getPosition(e)
   
-  // 计算速度
-  const dx = x - lastX
-  const dy = y - lastY
-  const speed = Math.sqrt(dx * dx + dy * dy)
+  // 硬笔书法：均匀线条，无粗细变化
+  ctx.strokeStyle = inkColor.value
+  ctx.lineWidth = brushSize.value
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
   
-  // 速度越快，笔画越细
-  const speedFactor = Math.max(0.3, 1 - speed / 100)
-  
-  // 根据压力和速度计算粗细
-  const baseSize = brushSize.value
-  const dynamicWidth = baseSize * (0.5 + currentPressure * 0.5) * speedFactor
-  
-  // 绘制毛笔笔触 - 使用多个重叠的圆形模拟墨迹
-  drawBrushStroke(lastX, lastY, x, y, dynamicWidth, currentPressure)
+  ctx.beginPath()
+  ctx.moveTo(lastX, lastY)
+  ctx.lineTo(x, y)
+  ctx.stroke()
   
   lastX = x
   lastY = y
-  lastPressure = currentPressure
-  strokePoints.push({ x, y, pressure: currentPressure })
-}
-
-// 绘制毛笔笔触
-const drawBrushStroke = (x1, y1, x2, y2, width, pressure) => {
-  const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-  const angle = Math.atan2(y2 - y1, x2 - x1)
-  
-  // 分离墨色 RGB
-  const color = hexToRgb(inkColor.value)
-  
-  // 绘制多层模拟毛笔边缘
-  for (let i = 0; i <= distance; i += 2) {
-    const t = i / distance
-    const x = x1 + (x2 - x1) * t
-    const y = y1 + (y2 - y1) * t
-    
-    // 核心 - 深色
-    const coreSize = width * 0.6
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, coreSize)
-    gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.9 + pressure * 0.1})`)
-    gradient.addColorStop(0.5, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.7})`)
-    gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`)
-    
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.ellipse(x, y, coreSize, coreSize * 0.8, angle, 0, Math.PI * 2)
-    ctx.fill()
-    
-    // 晕染效果 - 边缘模糊
-    const blurSize = width * 0.9
-    const blurGradient = ctx.createRadialGradient(x, y, coreSize * 0.8, x, y, blurSize)
-    blurGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`)
-    blurGradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`)
-    
-    ctx.fillStyle = blurGradient
-    ctx.beginPath()
-    ctx.ellipse(x, y, blurSize, blurSize * 0.75, angle, 0, Math.PI * 2)
-    ctx.fill()
-  }
-}
-
-// Hex 转 RGB
-const hexToRgb = (hex) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 26, g: 26, b: 26 }
 }
 
 // 停止绘制
 const stopDraw = () => {
   isDrawing.value = false
-  strokePoints = []
 }
 
-// 获取坐标（支持触摸压力）
+// 获取坐标
 const getPosition = (e) => {
   const canvas = canvasRef.value
   const rect = canvas.getBoundingClientRect()
   
-  let clientX, clientY, pressure = 0.5
+  let clientX, clientY
   
   if (e.touches && e.touches.length > 0) {
     clientX = e.touches[0].clientX
     clientY = e.touches[0].clientY
-    // 尝试获取触摸压力
-    pressure = e.touches[0].force || 0.5
   } else {
     clientX = e.clientX
     clientY = e.clientY
-    // 鼠标时使用速度估算压力（移动越快压力越小）
   }
   
   // 缩放影响
@@ -324,8 +258,7 @@ const getPosition = (e) => {
   
   return {
     x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY,
-    pressure
+    y: (clientY - rect.top) * scaleY
   }
 }
 
